@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import './App.css';
 import { createFFmpeg, fetchFile } from '@ffmpeg/ffmpeg';
 import RangeInput from './RangeInput';
@@ -49,30 +49,18 @@ function App() {
 		};
 		console.log({ meta });
 		setVideoMeta(meta);
+		const thumbNails = await getThumbNails(meta);
+		setThumbNails(thumbNails);
 	};
 
-	const str = JSON.stringify(videoMeta);
-
-	useEffect(() => {
-		if (!videoMeta) return;
-		(async function () {
-			const thumbNails = await getThumbNails(videoMeta);
-			setThumbNails(thumbNails);
-		})();
-	}, [str]);
-
-	const getThumbNails = async ({ duration, video, videoWidth }) => {
+	const getThumbNails = async ({ duration }) => {
 		if (!FF.isLoaded()) await FF.load();
 		setThumbnailIsProcessing(true);
 		let NUMBER_OF_IMAGES = duration < 15 ? duration : 15;
 		const FRAME_RATE = duration >= 15 ? '1' : `1/${Math.floor(duration)}`;
 		let offset = duration === 15 ? 1 : duration / NUMBER_OF_IMAGES;
-		// if (offset < 1) {
-		// 	offset = 1;
-		// 	NUMBER_OF_IMAGES = duration - 1;
-		// }
 
-		const blobChunk = [];
+		const arrayOfImageURIs = [];
 
 		for (let i = 0; i < NUMBER_OF_IMAGES; i++) {
 			let startTimeInSecs = helpers.toTimeString(Math.round(i * offset));
@@ -80,9 +68,9 @@ function App() {
 			if (startTimeInSecs + offset > duration && offset > 1) {
 				offset = 0;
 			}
-			console.log({
-				startTimeInSecs,
-			});
+			// console.log({
+			// 	startTimeInSecs,
+			// });
 			FF.FS('writeFile', inputVideoFile.name, await fetchFile(inputVideoFile));
 			try {
 				await FF.run(
@@ -101,13 +89,13 @@ function App() {
 
 				let blob = new Blob([data.buffer], { type: 'image/png' });
 				let dataURI = await helpers.readFileAsBase64(blob);
-				blobChunk.push(dataURI);
+				arrayOfImageURIs.push(dataURI);
 			} catch (error) {
 				console.log({ message: error });
 			}
 		}
 		setThumbnailIsProcessing(false);
-		return blobChunk;
+		return arrayOfImageURIs;
 	};
 
 	const handleTrim = async () => {
