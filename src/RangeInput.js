@@ -2,24 +2,18 @@ import React from 'react';
 import * as helpers from './helpers';
 
 export default function RangeInput({
-	children,
+	thumbNails,
 	rEnd,
 	rStart,
-	setRstart,
-	setRend,
-	handleUpdateRange,
+	handleUpdaterStart,
+	handleUpdaterEnd,
 	loading,
 	control,
 	videoMeta,
-	noThumbNails,
 }) {
 	let RANGE_MAX = 100;
-	console.log({
-		noThumbNails,
-		loading,
-	});
 
-	if (noThumbNails && !loading) {
+	if (thumbNails.length === 0 && !loading) {
 		return null;
 	}
 
@@ -34,12 +28,10 @@ export default function RangeInput({
 	return (
 		<>
 			<div className='range_pack'>
-				<div
-					className='image_box'
-					style={{
-						width: 100 * 15 + 'px',
-					}}>
-					{children}
+				<div className='image_box'>
+					{thumbNails.map((imgURL, id) => (
+						<img src={imgURL} alt={`sample_video_thumbnail_${id}`} key={id} />
+					))}
 
 					<div
 						className='clip_box'
@@ -58,7 +50,7 @@ export default function RangeInput({
 						type='range'
 						min={0}
 						max={RANGE_MAX}
-						onInput={handleUpdateRange(setRstart)}
+						onInput={handleUpdaterStart}
 						value={rStart}
 					/>
 					<input
@@ -66,7 +58,7 @@ export default function RangeInput({
 						type='range'
 						min={0}
 						max={RANGE_MAX}
-						onInput={handleUpdateRange(setRend)}
+						onInput={handleUpdaterEnd}
 						value={rEnd}
 					/>
 				</div>

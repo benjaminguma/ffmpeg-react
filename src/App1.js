@@ -56,9 +56,10 @@ function App() {
 	const getThumbNails = async ({ duration }) => {
 		if (!FF.isLoaded()) await FF.load();
 		setThumbnailIsProcessing(true);
-		let NUMBER_OF_IMAGES = duration < 15 ? duration : 15;
-		const FRAME_RATE = duration >= 15 ? '1' : `1/${Math.floor(duration)}`;
-		let offset = duration === 15 ? 1 : duration / NUMBER_OF_IMAGES;
+		let MAX_NUMBER_OF_IMAGES = 15;
+		let NUMBER_OF_IMAGES = duration < MAX_NUMBER_OF_IMAGES ? duration : 15;
+		const FRAME_RATE = duration >= MAX_NUMBER_OF_IMAGES ? '1' : `1/${Math.floor(duration)}`;
+		let offset = duration === MAX_NUMBER_OF_IMAGES ? 1 : duration / NUMBER_OF_IMAGES;
 
 		const arrayOfImageURIs = [];
 
@@ -80,21 +81,22 @@ function App() {
 					inputVideoFile.name,
 					'-t',
 					'00:00:1.000',
-					'-an',
 					'-vf',
-					`fps=${FRAME_RATE},scale=200:-1`,
+					`fps=${FRAME_RATE},scale=150:-1`,
 					`img${i}.png`,
 				);
 				const data = FF.FS('readFile', `img${i}.png`);
 
 				let blob = new Blob([data.buffer], { type: 'image/png' });
 				let dataURI = await helpers.readFileAsBase64(blob);
+				FF.FS('unlink', `img${i}.png`);
 				arrayOfImageURIs.push(dataURI);
 			} catch (error) {
 				console.log({ message: error });
 			}
 		}
 		setThumbnailIsProcessing(false);
+
 		return arrayOfImageURIs;
 	};
 
@@ -102,8 +104,8 @@ function App() {
 		setTrimIsProcessing(true);
 
 		let startTime = ((rStart / 100) * videoMeta.duration).toFixed(2);
-		let endTime = ((rEnd / 100) * videoMeta.duration - startTime).toFixed(2);
-		console.log(startTime, endTime, helpers.toTimeString(startTime), helpers.toTimeString(endTime));
+		let offset = ((rEnd / 100) * videoMeta.duration - startTime).toFixed(2);
+		console.log(startTime, offset, helpers.toTimeString(startTime), helpers.toTimeString(offset));
 
 		try {
 			FF.FS('writeFile', inputVideoFile.name, await fetchFile(inputVideoFile));
@@ -114,8 +116,8 @@ function App() {
 				'-i',
 				inputVideoFile.name,
 				'-t',
-				helpers.toTimeString(endTime),
-				'-c:v',
+				helpers.toTimeString(offset),
+				'-c',
 				'copy',
 				'ping.mp4',
 			);
@@ -145,23 +147,19 @@ function App() {
 					<RangeInput
 						rEnd={rEnd}
 						rStart={rStart}
-						handleUpdateRange={handleUpdateRange}
-						setRend={setRend}
-						setRstart={setRstart}
+						handleUpdaterStart={handleUpdateRange(setRstart)}
+						handleUpdaterEnd={handleUpdateRange(setRend)}
 						loading={thumbnailIsProcessing}
 						videoMeta={videoMeta}
-						noThumbNails={thumbNails.length === 0}
 						control={
 							<div className='u-center'>
 								<button onClick={handleTrim} className='btn btn_b' disabled={trimIsProcessing}>
 									{trimIsProcessing ? 'trimming...' : 'trim selected'}
 								</button>
 							</div>
-						}>
-						{thumbNails.map((imgURL, id) => (
-							<img src={imgURL} alt={`sample_video_thumbnail_${id}`} key={id} />
-						))}
-					</RangeInput>
+						}
+						thumbNails={thumbNails}
+					/>
 				</>
 			}
 			<section className='deck'>
@@ -173,7 +171,7 @@ function App() {
 								autoPlay
 								controls
 								muted
-								onCanPlay={handleLoadedData}
+								onLoadedMetadata={handleLoadedData}
 								width='450'></video>
 						</div>
 					</VideoFilePicker>
