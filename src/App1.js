@@ -58,21 +58,14 @@ function App() {
 		setThumbnailIsProcessing(true);
 		let MAX_NUMBER_OF_IMAGES = 15;
 		let NUMBER_OF_IMAGES = duration < MAX_NUMBER_OF_IMAGES ? duration : 15;
-		const FRAME_RATE = duration >= MAX_NUMBER_OF_IMAGES ? '1' : `1/${Math.floor(duration)}`;
 		let offset = duration === MAX_NUMBER_OF_IMAGES ? 1 : duration / NUMBER_OF_IMAGES;
 
 		const arrayOfImageURIs = [];
+		FF.FS('writeFile', inputVideoFile.name, await fetchFile(inputVideoFile));
 
 		for (let i = 0; i < NUMBER_OF_IMAGES; i++) {
 			let startTimeInSecs = helpers.toTimeString(Math.round(i * offset));
 
-			if (startTimeInSecs + offset > duration && offset > 1) {
-				offset = 0;
-			}
-			// console.log({
-			// 	startTimeInSecs,
-			// });
-			FF.FS('writeFile', inputVideoFile.name, await fetchFile(inputVideoFile));
 			try {
 				await FF.run(
 					'-ss',
@@ -82,7 +75,7 @@ function App() {
 					'-t',
 					'00:00:1.000',
 					'-vf',
-					`fps=${FRAME_RATE},scale=150:-1`,
+					`scale=150:-1`,
 					`img${i}.png`,
 				);
 				const data = FF.FS('readFile', `img${i}.png`);
