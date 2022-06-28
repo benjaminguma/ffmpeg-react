@@ -20,13 +20,13 @@ function App() {
 	const [trimmedVideoFile, setTrimmedVideoFile] = useState(null);
 	// const ref = useRef();
 	const [videoMeta, setVideoMeta] = useState(null);
-	const [thumbNails, setThumbNails] = useState([]);
 	const [URL, setURL] = useState([]);
 	const [trimIsProcessing, setTrimIsProcessing] = useState(false);
-	const [thumbnailIsProcessing, setThumbnailIsProcessing] = useState(false);
 
 	const [rStart, setRstart] = useState(0);
 	const [rEnd, setRend] = useState(10);
+	const [thumbNails, setThumbNails] = useState([]);
+	const [thumbnailIsProcessing, setThumbnailIsProcessing] = useState(false);
 
 	const handleChange = async (e) => {
 		let file = e.target.files[0];
