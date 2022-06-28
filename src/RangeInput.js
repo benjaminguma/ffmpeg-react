@@ -11,8 +11,6 @@ export default function RangeInput({
 	control,
 	videoMeta,
 }) {
-	let RANGE_MAX = 100;
-
 	if (thumbNails.length === 0 && !loading) {
 		return null;
 	}
@@ -39,8 +37,8 @@ export default function RangeInput({
 							width: `calc(${rEnd - rStart}% )`,
 							left: `${rStart}%`,
 						}}
-						data-start={helpers.toTimeString((rStart / RANGE_MAX) * videoMeta.duration, false)}
-						data-end={helpers.toTimeString((rEnd / RANGE_MAX) * videoMeta.duration, false)}>
+						data-start={helpers.toTimeString((rStart / 100) * videoMeta.duration, false)}
+						data-end={helpers.toTimeString((rEnd / 100) * videoMeta.duration, false)}>
 						<span className='clip_box_des'></span>
 						<span className='clip_box_des'></span>
 					</div>
@@ -49,7 +47,7 @@ export default function RangeInput({
 						className='range'
 						type='range'
 						min={0}
-						max={RANGE_MAX}
+						max={100}
 						onInput={handleUpdaterStart}
 						value={rStart}
 					/>
@@ -57,7 +55,7 @@ export default function RangeInput({
 						className='range'
 						type='range'
 						min={0}
-						max={RANGE_MAX}
+						max={100}
 						onInput={handleUpdaterEnd}
 						value={rEnd}
 					/>

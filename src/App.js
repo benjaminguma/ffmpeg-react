@@ -1,72 +1,180 @@
-import 'react-responsive-carousel/lib/styles/carousel.min.css'; // requires a loader
+import { useState } from 'react';
 import './App.css';
-import { Carousel } from 'react-responsive-carousel';
-import sprite from './sprite.svg';
+import { createFFmpeg, fetchFile } from '@ffmpeg/ffmpeg';
+import RangeInput from './RangeInput';
+import * as helpers from './helpers';
+import VideoFilePicker from './VideoFilePicker';
+import OutPutVideo from './OutPutVideo';
 
-const images = [
-	'https://res.cloudinary.com/dqydioa16/image/upload/v1653954061/rlpraaoty5zaxazsrodt.jpg',
-	'https://res.cloudinary.com/dqydioa16/image/upload/v1653953497/xj2xucrwmwp5c3bfnene.jpg',
-	'https://res.cloudinary.com/dqydioa16/image/upload/v1653953497/ymsneptkynl7sz8os8vq.jpg',
-	'https://images.unsplash.com/photo-1654096048549-843088f43455?ixlib=rb-1.2.1&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=3403&q=80',
-];
+const FF = createFFmpeg({
+	// log: true,
+	corePath: 'https://unpkg.com/@ffmpeg/core@0.10.0/dist/ffmpeg-core.js',
+});
+
+(async function () {
+	await FF.load();
+})();
 
 function App() {
-	const rotateAnimationHandler = (props, state) => {
-		console.log(props, state);
-		const transitionTime = props.transitionTime + 'ms';
-		const transitionTimingFunction = 'ease-in-out';
+	const [inputVideoFile, setInputVideoFile] = useState(null);
+	const [trimmedVideoFile, setTrimmedVideoFile] = useState(null);
+	// const ref = useRef();
+	const [videoMeta, setVideoMeta] = useState(null);
+	const [thumbNails, setThumbNails] = useState([]);
+	const [URL, setURL] = useState([]);
+	const [trimIsProcessing, setTrimIsProcessing] = useState(false);
+	const [thumbnailIsProcessing, setThumbnailIsProcessing] = useState(false);
 
-		let slideStyle = {
-			display: 'block',
-			minHeight: '100%',
-			transitionTimingFunction: transitionTimingFunction,
-			msTransitionTimingFunction: transitionTimingFunction,
-			MozTransitionTimingFunction: transitionTimingFunction,
-			WebkitTransitionTimingFunction: transitionTimingFunction,
-			OTransitionTimingFunction: transitionTimingFunction,
-			// transform: `rotate(0)`,
-			transform: `rotate(0)`,
-			position: state.previousItem === state.selectedItem ? 'relative' : 'absolute',
-			inset: '0 0 0 0',
-			zIndex: state.previousItem === state.selectedItem ? '1' : '-2',
+	const [rStart, setRstart] = useState(0);
+	const [rEnd, setRend] = useState(10);
 
-			opacity: state.previousItem === state.selectedItem ? '1' : '0',
-			WebkitTransitionDuration: transitionTime,
-			MozTransitionDuration: transitionTime,
-			OTransitionDuration: transitionTime,
-			transitionDuration: transitionTime,
-			msTransitionDuration: transitionTime,
+	const handleChange = async (e) => {
+		let file = e.target.files[0];
+		console.log(file);
+		setInputVideoFile(file);
+
+		setURL(await helpers.readFileAsBase64(file));
+	};
+
+	const handleLoadedData = async (e) => {
+		// console.dir(ref.current);
+
+		const el = e.target;
+
+		const meta = {
+			name: inputVideoFile.name,
+			duration: el.duration,
+			videoWidth: el.videoWidth,
+			videoHeight: el.videoHeight,
 		};
+		console.log({ meta });
+		setVideoMeta(meta);
+		const thumbNails = await getThumbNails(meta);
+		setThumbNails(thumbNails);
+	};
 
-		return {
-			slideStyle,
-			selectedStyle: {
-				...slideStyle,
-				opacity: 1,
-				position: 'relative',
-				zIndex: 2,
-				filter: `blur(0)`,
-			},
-			prevStyle: {
-				...slideStyle,
-				transformOrigin: ' 0 100%',
-				transform: `rotate(${state.previousItem > state.selectedItem ? '-45deg' : '45deg'})`,
-				opacity: '0',
-				filter: `blur( ${state.previousItem === state.selectedItem ? '0px' : '30px'})`,
-			},
+	const getThumbNails = async ({ duration }) => {
+		if (!FF.isLoaded()) await FF.load();
+		setThumbnailIsProcessing(true);
+		let MAX_NUMBER_OF_IMAGES = 15;
+		let NUMBER_OF_IMAGES = duration < MAX_NUMBER_OF_IMAGES ? duration : 15;
+		let offset = duration === MAX_NUMBER_OF_IMAGES ? 1 : duration / NUMBER_OF_IMAGES;
+
+		const arrayOfImageURIs = [];
+		FF.FS('writeFile', inputVideoFile.name, await fetchFile(inputVideoFile));
+
+		for (let i = 0; i < NUMBER_OF_IMAGES; i++) {
+			let startTimeInSecs = helpers.toTimeString(Math.round(i * offset));
+
+			try {
+				await FF.run(
+					'-ss',
+					startTimeInSecs,
+					'-i',
+					inputVideoFile.name,
+					'-t',
+					'00:00:1.000',
+					'-vf',
+					`scale=150:-1`,
+					`img${i}.png`,
+				);
+				const data = FF.FS('readFile', `img${i}.png`);
+
+				let blob = new Blob([data.buffer], { type: 'image/png' });
+				let dataURI = await helpers.readFileAsBase64(blob);
+				FF.FS('unlink', `img${i}.png`);
+				arrayOfImageURIs.push(dataURI);
+			} catch (error) {
+				console.log({ message: error });
+			}
+		}
+		setThumbnailIsProcessing(false);
+
+		return arrayOfImageURIs;
+	};
+
+	const handleTrim = async () => {
+		setTrimIsProcessing(true);
+
+		let startTime = ((rStart / 100) * videoMeta.duration).toFixed(2);
+		let offset = ((rEnd / 100) * videoMeta.duration - startTime).toFixed(2);
+		console.log(startTime, offset, helpers.toTimeString(startTime), helpers.toTimeString(offset));
+
+		try {
+			FF.FS('writeFile', inputVideoFile.name, await fetchFile(inputVideoFile));
+			// await FF.run('-ss', '00:00:13.000', '-i', inputVideoFile.name, '-t', '00:00:5.000', 'ping.mp4');
+			await FF.run(
+				'-ss',
+				helpers.toTimeString(startTime),
+				'-i',
+				inputVideoFile.name,
+				'-t',
+				helpers.toTimeString(offset),
+				'-c',
+				'copy',
+				'ping.mp4',
+			);
+
+			const data = FF.FS('readFile', 'ping.mp4');
+			console.log(data);
+			const dataURL = await helpers.readFileAsBase64(new Blob([data.buffer], { type: 'video/mp4' }));
+
+			setTrimmedVideoFile(dataURL);
+		} catch (error) {
+			console.log(error);
+		} finally {
+			setTrimIsProcessing(false);
+		}
+	};
+
+	const handleUpdateRange = (func) => {
+		return ({ target: { value } }) => {
+			func(value);
 		};
 	};
 
 	return (
-		<div className='box'>
-			<Carousel>
-				{images.map((URL, index) => (
-					<div className='slide'>
-						<img alt='sample_file' src={URL} key={index} />
-					</div>
-				))}
-			</Carousel>
-		</div>
+		<main className='App'>
+			{
+				<>
+					<RangeInput
+						rEnd={rEnd}
+						rStart={rStart}
+						handleUpdaterStart={handleUpdateRange(setRstart)}
+						handleUpdaterEnd={handleUpdateRange(setRend)}
+						loading={thumbnailIsProcessing}
+						videoMeta={videoMeta}
+						control={
+							<div className='u-center'>
+								<button onClick={handleTrim} className='btn btn_b' disabled={trimIsProcessing}>
+									{trimIsProcessing ? 'trimming...' : 'trim selected'}
+								</button>
+							</div>
+						}
+						thumbNails={thumbNails}
+					/>
+				</>
+			}
+			<section className='deck'>
+				<article className='grid_txt_2'>
+					<VideoFilePicker handleChange={handleChange} showVideo={!!inputVideoFile}>
+						<div className='bord_g_2 p_2'>
+							<video
+								src={inputVideoFile ? URL : null}
+								autoPlay
+								controls
+								muted
+								onLoadedMetadata={handleLoadedData}
+								width='450'></video>
+						</div>
+					</VideoFilePicker>
+				</article>
+				<OutPutVideo
+					videoSrc={trimmedVideoFile}
+					handleDownload={() => helpers.download(trimmedVideoFile)}
+				/>
+			</section>
+		</main>
 	);
 }
 
